@@ -1,0 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "sqlite"
+  url = env("DATABASE_URL")
+}
+model User {
+  id Int @id @default(autoincrement())
+  nickname String
+  careerStage String?
+  createdAt DateTime @default(now())
+  goals Goal[]
+  focusRecords FocusRecord[]
+  profile FlowProfile?
+}
+model Goal {
+  id Int @id @default(autoincrement())
+  userId Int
+  title String
+  description String
+  status String @default("ACTIVE")
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id])
+  tasks Task[]
+}
+model Task {
+  id Int @id @default(autoincrement())
+  goalId Int
+  title String
+  estimatedTime Int
+  status String @default("TODO")
+  sortOrder Int @default(0)
+  goal Goal @relation(fields: [goalId], references: [id])
+  focusRecords FocusRecord[]
+}
+model FocusRecord {
+  id Int @id @default(autoincrement())
+  userId Int
+  taskId Int?
+  duration Int
+  focusScore Int @default(5)
+  distractionCount Int @default(0)
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id])
+  task Task? @relation(fields: [taskId], references: [id])
+}
+model FlowProfile {
+  id Int @id @default(autoincrement())
+  userId Int @unique
+  type String
+  bestTime String
+  strength String
+  weakness String
+  suggestion String
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id])
+}
