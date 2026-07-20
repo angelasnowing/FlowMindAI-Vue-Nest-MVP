@@ -11,12 +11,29 @@ async function bootstrap() {
   const port = config.get<number>("PORT", 3000);
   const apiPrefix = config.get<string>("API_PREFIX", "api");
   const corsOrigins = config
-    .get<string>("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174")
+    .get<string>(
+      "CORS_ORIGINS",
+      "https://flow-mind-ai-vue-nest-mvp-web.vercel.app,http://localhost:5173,http://localhost:5174",
+    )
     .split(",")
-    .map((origin) => origin.trim())
+    .map((origin) =>
+      origin
+        .trim()
+        .replace(/^["']|["']$/g, "")
+        .replace(/\/$/, ""),
+    )
     .filter(Boolean);
 
-  app.enableCors({ origin: corsOrigins, credentials: true });
+  app.enableCors({
+    origin(origin, callback) {
+      if (!origin || corsOrigins.includes(origin.replace(/\/$/, ""))) {
+        callback(null, true);
+        return;
+      }
+      callback(null, false);
+    },
+    credentials: true,
+  });
   app.setGlobalPrefix(apiPrefix);
   app.useGlobalPipes(
     new ValidationPipe({
