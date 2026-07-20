@@ -1,6 +1,7 @@
 <template>
   <div class="app-shell">
     <AppSidebar v-model="tab" />
+    <PwaStatus />
     <main>
       <AppHeader :tab="tab" :nickname="data?.nickname" />
       <HomeView
@@ -45,6 +46,7 @@
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import AppHeader from "./components/layout/AppHeader.vue";
 import AppSidebar from "./components/layout/AppSidebar.vue";
+import PwaStatus from "./components/PwaStatus.vue";
 import { dashboardApi } from "./services/dashboard.api";
 import { getApiErrorMessage } from "./services/api";
 import { focusRecordsApi } from "./services/focus-records.api";
@@ -59,7 +61,7 @@ import type { DashboardData, FocusStatistics, Task, TabKey } from "./types";
 
 const tab = ref<TabKey>("home");
 const data = ref<DashboardData | null>(null);
-const goalInput = ref("我想在1个月内学习国际象棋基础棋局");
+const goalInput = ref("我想在1个月内学习11种国际象棋开局方式");
 const mood = ref("目标清晰");
 const loading = ref(false);
 const planError = ref("");
@@ -268,7 +270,7 @@ main {
     display: block;
   }
   .page {
-    padding: 24px 18px 95px;
+    padding: 24px 18px calc(110px + env(safe-area-inset-bottom));
   }
 }
 </style>

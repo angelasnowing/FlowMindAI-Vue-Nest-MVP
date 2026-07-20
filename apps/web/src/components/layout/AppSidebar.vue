@@ -109,7 +109,7 @@ nav button.active {
     bottom: 0;
     left: 0;
     z-index: 10;
-    padding: 7px 10px;
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
     border-top: 1px solid var(--line);
     background: rgba(252, 249, 244, 0.96);
     box-shadow: 0 -8px 28px rgba(79, 67, 55, 0.06);
@@ -123,14 +123,18 @@ nav button.active {
     grid-template-columns: repeat(5, 1fr);
   }
   nav button {
-    padding: 8px 3px;
-    font-size: 10px;
+    min-height: 58px;
+    padding: 7px 3px 6px;
+    font-size: 13px;
+    line-height: 1.25;
     text-align: center;
   }
   nav button span {
     display: block;
     width: auto;
-    font-size: 18px;
+    margin-bottom: 3px;
+    font-size: 24px;
+    line-height: 1;
   }
   nav button.active {
     box-shadow: inset 0 3px 0 var(--sage-dark);
