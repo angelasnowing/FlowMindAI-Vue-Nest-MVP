@@ -1,33 +1,97 @@
+<template>
+  <div class="app-shell">
+    <AppSidebar v-model="tab" />
+    <main>
+      <AppHeader :tab="tab" :nickname="data?.nickname" />
+      <HomeView
+        v-if="tab === 'home'"
+        v-model:goal-input="goalInput"
+        v-model:mood="mood"
+        :loading="loading"
+        :error-message="planError"
+        @create-plan="createPlan"
+      />
+      <PlanView
+        v-else-if="tab === 'plan'"
+        :goal="goal"
+        :tasks="tasks"
+        @start-focus="startFocus"
+        @update-task-status="updateTaskStatus"
+      />
+      <FocusView
+        v-else-if="tab === 'focus'"
+        :selected="selected"
+        :fallback-task="tasks[0]"
+        :time="time"
+        :progress="progress"
+        :seconds="seconds"
+        :running="running"
+        :finished="finished"
+        :focus-count="data?.focusRecords.length ?? 0"
+        @toggle-running="running = !running"
+        @complete="completeFocus"
+      />
+      <DataView
+        v-else-if="tab === 'data'"
+        :profile="data?.profile"
+        :statistics="statistics"
+      />
+      <ProfileView v-else :nickname="data?.nickname" />
+    </main>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
-import axios from "axios";
-type Task = {
-  id: number;
-  title: string;
-  estimatedTime: number;
-  status: string;
-};
-const api = axios.create({ baseURL: "http://localhost:3000/api" });
-const tab = ref("home");
-const data = ref<any>(null);
-const goalInput = ref("我想学习 NestJS 成为全栈开发工程师");
+import AppHeader from "./components/layout/AppHeader.vue";
+import AppSidebar from "./components/layout/AppSidebar.vue";
+import { dashboardApi } from "./services/dashboard.api";
+import { getApiErrorMessage } from "./services/api";
+import { focusRecordsApi } from "./services/focus-records.api";
+import { goalsApi } from "./services/goals.api";
+import { tasksApi } from "./services/tasks.api";
+import DataView from "./views/DataView.vue";
+import FocusView from "./views/FocusView.vue";
+import HomeView from "./views/HomeView.vue";
+import PlanView from "./views/PlanView.vue";
+import ProfileView from "./views/ProfileView.vue";
+import type { DashboardData, FocusStatistics, Task, TabKey } from "./types";
+
+const tab = ref<TabKey>("home");
+const data = ref<DashboardData | null>(null);
+const goalInput = ref("我想在1个月内学习国际象棋基础棋局");
 const mood = ref("目标清晰");
 const loading = ref(false);
+const planError = ref("");
 const selected = ref<Task | null>(null);
 const seconds = ref(1500);
 const running = ref(false);
 const finished = ref(false);
+const statistics = ref<FocusStatistics>({
+  count: 0,
+  totalDuration: 0,
+  totalDistractions: 0,
+  averageDuration: 0,
+  averageFocusScore: 0,
+});
 let timer: number | undefined;
+
 const goal = computed(() => data.value?.goals?.[0]);
-const tasks = computed<Task[]>(() => goal.value?.tasks || []);
+const tasks = computed(() => goal.value?.tasks ?? []);
 const time = computed(
   () =>
     `${String(Math.floor(seconds.value / 60)).padStart(2, "0")}:${String(seconds.value % 60).padStart(2, "0")}`,
 );
 const progress = computed(() => ((1500 - seconds.value) / 1500) * 100);
-async function load() {
+
+async function loadDashboard() {
   try {
-    data.value = (await api.get("/dashboard")).data;
+    const [dashboard, focusStatistics] = await Promise.all([
+      dashboardApi.get(),
+      focusRecordsApi.statistics(),
+    ]);
+    data.value = dashboard;
+    statistics.value = focusStatistics;
   } catch {
     data.value = {
       nickname: "Sherry",
@@ -43,261 +107,168 @@ async function load() {
     };
   }
 }
+
 async function createPlan() {
   if (!goalInput.value.trim()) return;
+
   loading.value = true;
-  const g = (await api.post("/plans", { title: goalInput.value })).data;
-  data.value.goals = [g, ...(data.value.goals || [])];
-  loading.value = false;
-  tab.value = "plan";
+  planError.value = "";
+  try {
+    const goal = await goalsApi.createPlan({
+      title: goalInput.value,
+      mood: mood.value,
+    });
+    if (data.value) data.value.goals = [goal, ...data.value.goals];
+    tab.value = "plan";
+  } catch (error) {
+    planError.value = getApiErrorMessage(error);
+  } finally {
+    loading.value = false;
+  }
 }
-function start(t: Task) {
-  selected.value = t;
+
+function startFocus(task: Task) {
+  selected.value = task;
   seconds.value = 1500;
   finished.value = false;
   tab.value = "focus";
   running.value = true;
-  tick();
+  startTimer();
 }
-function tick() {
+
+async function updateTaskStatus(task: Task, status: "TODO" | "DONE") {
+  const updated = await tasksApi.update(task.id, { status });
+  task.status = updated.status;
+}
+
+function startTimer() {
   clearInterval(timer);
   timer = window.setInterval(() => {
     if (running.value && seconds.value > 0) seconds.value--;
-    if (seconds.value === 0) complete();
+    if (seconds.value === 0) completeFocus();
   }, 1000);
 }
-async function complete() {
+
+async function completeFocus() {
   running.value = false;
   clearInterval(timer);
-  await api.post("/focus", {
+  const record = await focusRecordsApi.create({
     taskId: selected.value?.id,
     duration: 1500 - seconds.value,
     distractionCount: 0,
     focusScore: 5,
   });
+  if (data.value) data.value.focusRecords.unshift(record);
+  statistics.value = await focusRecordsApi.statistics();
   if (selected.value) selected.value.status = "DONE";
   finished.value = true;
 }
-onMounted(load);
+
+onMounted(loadDashboard);
 onUnmounted(() => clearInterval(timer));
 </script>
 
-<template>
-  <div class="app-shell">
-    <aside>
-      <div class="brand">
-        <span class="brand-mark">✦</span><b>FlowMindAI</b>
-      </div>
-      <p class="aside-label">心流工作台</p>
-      <nav>
-        <button
-          v-for="i in [
-            { k: 'home', n: '首页', icon: '⌂' },
-            { k: 'plan', n: '计划', icon: '▣' },
-            { k: 'focus', n: '专注', icon: '◷' },
-            { k: 'data', n: '数据', icon: '▥' },
-            { k: 'me', n: '我的', icon: '♙' },
-          ]"
-          :class="{ active: tab === i.k }"
-          @click="tab = i.k"
-        >
-          <span>{{ i.icon }}</span
-          >{{ i.n }}
-        </button>
-      </nav>
-      <div class="aside-card">
-        <span>🌱</span><b>连续成长 7 天</b><small>今天也向目标靠近了一点</small>
-      </div>
-    </aside>
-    <main>
-      <header>
-        <div>
-          <small>{{
-            new Date().toLocaleDateString("zh-CN", {
-              month: "long",
-              day: "numeric",
-              weekday: "long",
-            })
-          }}</small>
-          <h2>
-            {{
-              tab === "home"
-                ? "下午好，" + (data?.nickname || "Sherry") + " 👋"
-                : tab === "plan"
-                  ? "你的成长计划"
-                  : tab === "focus"
-                    ? "进入心流时刻"
-                    : tab === "data"
-                      ? "心流画像"
-                      : "个人中心"
-            }}
-          </h2>
-        </div>
-        <div class="head-actions">
-          <button class="icon-btn">🔔</button>
-          <div class="avatar">S</div>
-        </div>
-      </header>
-      <section v-if="tab === 'home'" class="page home">
-        <div class="hero">
-          <div>
-            <span class="eyebrow">今日状态</span>
-            <h1>现在的你处于<br /><em>什么状态？</em></h1>
-            <p>觉察自己，是进入心流的第一步。</p>
-          </div>
-          <div class="quote">
-            “专注不是用力，<br />而是温柔地回到当下。”<span
-              >FLOW NOTE · 07</span
-            >
-          </div>
-        </div>
-        <div class="moods">
-          <button
-            v-for="m in [
-              { e: '😌', t: '能量较低', d: '不妨从小事开始' },
-              { e: '🙂', t: '目标清晰', d: '保持节奏向前走' },
-              { e: '⭐', t: '状态不错', d: '适合挑战深度任务' },
-            ]"
-            :class="{ chosen: mood === m.t }"
-            @click="mood = m.t"
-          >
-            <span>{{ m.e }}</span
-            ><b>{{ m.t }}</b
-            ><small>{{ m.d }}</small>
-          </button>
-        </div>
-        <div class="goal-card">
-          <div>
-            <span class="eyebrow">目标输入</span>
-            <h3>今天想完成什么？</h3>
-          </div>
-          <span class="counter">{{ goalInput.length }} / 300</span
-          ><el-input
-            v-model="goalInput"
-            type="textarea"
-            :rows="4"
-            resize="none"
-          /><button class="primary" :disabled="loading" @click="createPlan">
-            {{ loading ? "正在生成成长计划…" : "AI 生成成长计划 ✦" }}
-          </button>
-        </div>
-      </section>
-      <section v-else-if="tab === 'plan'" class="page plan">
-        <div class="analysis">
-          <span class="eyebrow">AI 分析结果</span>
-          <div class="insights">
-            <div>
-              <h4>你的优势</h4>
-              <p>✓ 前端基础扎实</p>
-              <p>✓ 有工程化经验</p>
-              <p>✓ 学习动力强</p>
-            </div>
-            <div class="warn">
-              <h4>当前挑战</h4>
-              <p>△ 后端架构经验不足</p>
-              <p>△ 缺少完整项目经验</p>
-              <p>△ 容易焦虑和拖延</p>
-            </div>
-          </div>
-        </div>
-        <div class="roadmap">
-          <span class="eyebrow">推荐成长路线 · 3个月</span>
-          <div class="months">
-            <div><b>第1月</b><small>后端基础</small></div>
-            <div><b>第2月</b><small>项目实战</small></div>
-            <div><b>第3月</b><small>部署上线</small></div>
-          </div>
-          <div class="task-list">
-            <h3>今日任务 <small>Day 1</small></h3>
-            <article
-              v-for="(t, i) in tasks"
-              :class="{ done: t.status === 'DONE' }"
-            >
-              <span class="num">{{ i + 1 }}</span>
-              <div>
-                <b>{{ t.title }}</b
-                ><small>预计 {{ t.estimatedTime }} 分钟</small>
-              </div>
-              <button @click="start(t)">
-                {{ t.status === "DONE" ? "✓" : "开始" }}
-              </button>
-            </article>
-          </div>
-        </div>
-      </section>
-      <section v-else-if="tab === 'focus'" class="page focus">
-        <div class="focus-card">
-          <span class="eyebrow">{{ running ? "正在专注" : "专注准备" }}</span>
-          <h2>
-            {{ selected?.title || tasks[0]?.title || "选择一个任务开始" }}
-          </h2>
-          <div class="timer" :style="{ '--p': progress + '%' }">
-            <div>
-              <strong>{{ time }}</strong
-              ><span>{{ running ? "专注中" : "保持呼吸" }}</span
-              ><small>🌱</small>
-            </div>
-          </div>
-          <div class="focus-stats">
-            <div>
-              <small>已专注</small
-              ><b>{{ Math.floor((1500 - seconds) / 60) }} 分钟</b>
-            </div>
-            <div>
-              <small>专注次数</small
-              ><b>{{ data?.focusRecords?.length || 0 }}</b>
-            </div>
-            <div><small>干扰次数</small><b>0</b></div>
-          </div>
-          <div class="focus-actions">
-            <button class="soft" @click="running = !running">
-              {{ running ? "暂停" : "继续" }}</button
-            ><button class="primary" @click="complete">完成任务</button>
-          </div>
-          <div v-if="finished" class="success">
-            🎉 本次心流已记录，做得很好！
-          </div>
-        </div>
-      </section>
-      <section v-else-if="tab === 'data'" class="page data">
-        <div class="profile-card">
-          <span class="eyebrow">你的心流画像</span>
-          <h1>🌱 {{ data?.profile?.type || "深度成长型" }}</h1>
-          <p>你倾向深度工作、专注力稳定，学习能力强。</p>
-          <div class="plant">●<span>❋</span></div>
-        </div>
-        <div class="metrics">
-          <div><small>总专注时长</small><b>18h 30m</b></div>
-          <div><small>专注次数</small><b>24</b></div>
-          <div><small>平均专注时长</small><b>45 min</b></div>
-          <div><small>专注度评分</small><b>4.3/5</b></div>
-        </div>
-        <div class="chart">
-          <h3>最佳专注时间段</h3>
-          <div class="bars">
-            <i
-              v-for="h in [18, 25, 82, 55, 34, 28, 12]"
-              :style="{ height: h + '%' }"
-            ></i>
-          </div>
-          <div class="labels">
-            <span>6-9点</span><span>9-12点</span><span>12-15点</span
-            ><span>15-18点</span><span>18-21点</span>
-          </div>
-        </div>
-        <div class="suggest">
-          <b>AI 建议 ✦</b>
-          <p>{{ data?.profile?.suggestion }}</p>
-        </div>
-      </section>
-      <section v-else class="page">
-        <div class="empty">
-          <div class="avatar big">S</div>
-          <h2>{{ data?.nickname || "Sherry" }}</h2>
-          <p>成长型开发者 · 连续专注 7 天</p>
-          <button class="soft">编辑个人资料</button>
-        </div>
-      </section>
-    </main>
-  </div>
-</template>
+<style>
+:root {
+  font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: #292b28;
+  background: #f7f3ed;
+  --sage: #91a79d;
+  --sage-dark: #718b7e;
+  --sage-soft: #dfe7e1;
+  --cream: #fbf8f3;
+  --sand: #eee7dd;
+  --blush: #ead3cb;
+  --peach: #f3dfcf;
+  --line: #e5ddd3;
+  --muted: #8b8983;
+  --shadow: 0 12px 36px rgba(83, 72, 60, 0.07);
+}
+
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  min-width: 320px;
+  background: #f7f3ed;
+  color: #292b28;
+}
+button {
+  font: inherit;
+}
+.app-shell {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 15% 8%, #fffdf9 0, transparent 32%),
+    linear-gradient(135deg, #f5f0e9, #fbf8f3 58%, #f2eee7);
+}
+main {
+  min-width: 0;
+}
+.page {
+  max-width: 1050px;
+  margin: 0 auto;
+  padding: 38px 4vw 70px;
+}
+.eyebrow {
+  font-size: 11px;
+  color: #768b81;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.goal-card,
+.analysis,
+.roadmap,
+.focus-card,
+.profile-card,
+.chart,
+.suggest,
+.empty {
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: rgba(255, 253, 249, 0.82);
+  box-shadow: var(--shadow);
+}
+.primary,
+.soft {
+  padding: 14px 25px;
+  border: 0;
+  border-radius: 11px;
+  cursor: pointer;
+}
+.primary {
+  color: white;
+  background: linear-gradient(135deg, #91a99d, #718b7e);
+  box-shadow: 0 7px 17px rgba(91, 121, 106, 0.18);
+}
+.primary:hover {
+  background: linear-gradient(135deg, #839d90, #637f72);
+}
+.soft {
+  color: #555750;
+  background: #eee7dd;
+}
+.avatar {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border-radius: 50%;
+  color: white;
+  font-weight: 700;
+  background: linear-gradient(145deg, #a7b9ae, #7f998d);
+  box-shadow: 0 5px 14px rgba(92, 116, 104, 0.18);
+}
+@media (max-width: 760px) {
+  .app-shell {
+    display: block;
+  }
+  .page {
+    padding: 24px 18px 95px;
+  }
+}
+</style>
