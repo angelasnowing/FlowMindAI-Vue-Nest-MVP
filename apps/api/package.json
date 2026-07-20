@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "dev": "nest start --watch",
-    "build": "nest build",
+    "build": "prisma generate && nest build",
     "start": "node dist/src/main.js",
     "start:prod": "node dist/src/main.js",
     "db:push": "prisma db push",
