@@ -61,7 +61,7 @@ import type { DashboardData, FocusStatistics, Task, TabKey } from "./types";
 
 const tab = ref<TabKey>("home");
 const data = ref<DashboardData | null>(null);
-const goalInput = ref("我想在1个月内学习11种国际象棋开局方式");
+const goalInput = ref("我想在1个月内学习5种国际象棋开局方式");
 const mood = ref("目标清晰");
 const loading = ref(false);
 const planError = ref("");
