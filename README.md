@@ -1,6 +1,6 @@
 # FlowMindAI
 
-2 天开发量的心流管理 MVP：Vue 3 + Element Plus + NestJS + Prisma + SQLite。
+心流管理 MVP：Vue 3 + Element Plus + NestJS + Prisma + SQLite。
 
 ## 启动
 
