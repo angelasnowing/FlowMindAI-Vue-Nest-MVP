@@ -10,11 +10,13 @@ async function bootstrap() {
   const config = app.get(ConfigService);
   const port = config.get<number>("PORT", 3000);
   const apiPrefix = config.get<string>("API_PREFIX", "api");
-  const corsOrigins = config
-    .get<string>(
-      "CORS_ORIGINS",
-      "https://flow-mind-ai-vue-nest-mvp-web.vercel.app,http://localhost:5173,http://localhost:5174",
-    )
+  const defaultCorsOrigins = [
+    "https://flow-mind-ai-vue-nest-mvp-web.vercel.app",
+    "http://localhost:5173",
+    "http://localhost:5174",
+  ];
+  const configuredCorsOrigins = config
+    .get<string>("CORS_ORIGINS", "")
     .split(",")
     .map((origin) =>
       origin
@@ -23,6 +25,9 @@ async function bootstrap() {
         .replace(/\/$/, ""),
     )
     .filter(Boolean);
+  const corsOrigins = [
+    ...new Set([...defaultCorsOrigins, ...configuredCorsOrigins]),
+  ];
 
   app.enableCors({
     origin(origin, callback) {
