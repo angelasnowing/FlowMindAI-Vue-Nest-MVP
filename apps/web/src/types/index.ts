@@ -14,6 +14,7 @@ export interface Goal {
   userId: number;
   title: string;
   description: string;
+  currentState: string;
   status: string;
   createdAt: string;
   tasks: Task[];
@@ -56,7 +57,7 @@ export interface CreateGoalPayload {
 }
 
 export interface CreatePlanPayload extends CreateGoalPayload {
-  mood?: string;
+  currentState: string;
 }
 
 export interface UpdateGoalPayload {

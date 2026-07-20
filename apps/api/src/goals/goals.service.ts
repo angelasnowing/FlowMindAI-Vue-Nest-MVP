@@ -61,7 +61,7 @@ export class GoalsService {
     const user = await this.users.getOrCreateCurrentUser();
     const plan = await this.aiPlan.generateTaskPlan({
       goal: dto.title.trim(),
-      mood: dto.mood,
+      currentState: dto.currentState,
       careerStage: user.careerStage,
     });
 
@@ -70,6 +70,7 @@ export class GoalsService {
         data: {
           userId: user.id,
           title: dto.title.trim(),
+          currentState: dto.currentState,
           description: dto.description?.trim() || plan.description,
         },
       });

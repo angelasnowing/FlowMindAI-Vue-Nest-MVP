@@ -16,8 +16,8 @@
       <button
         v-for="item in moods"
         :key="item.title"
-        :class="{ chosen: mood === item.title }"
-        @click="mood = item.title"
+        :class="{ chosen: currentState === item.title }"
+        @click="currentState = item.title"
       >
         <span>{{ item.emoji }}</span>
         <b>{{ item.title }}</b>
@@ -32,20 +32,30 @@
       </div>
       <span class="counter">{{ goalInput.length }} / 300</span>
       <el-input v-model="goalInput" type="textarea" :rows="4" resize="none" />
-      <button class="primary" :disabled="loading" @click="$emit('createPlan')">
+      <button
+        class="primary"
+        :disabled="loading || !canCreatePlan"
+        @click="$emit('createPlan')"
+      >
         {{ loading ? "正在生成成长计划…" : "AI 生成成长计划 ✦" }}
       </button>
+      <p v-if="!currentState" class="plan-hint">请先选择你当前的状态。</p>
       <p v-if="errorMessage" class="plan-error">{{ errorMessage }}</p>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
+
 defineProps<{ loading: boolean; errorMessage?: string }>();
 defineEmits<{ createPlan: [] }>();
 
 const goalInput = defineModel<string>("goalInput", { required: true });
-const mood = defineModel<string>("mood", { required: true });
+const currentState = defineModel<string>("currentState", { required: true });
+const canCreatePlan = computed(() =>
+  Boolean(currentState.value && goalInput.value.trim()),
+);
 
 const moods = [
   { emoji: "😌", title: "能量较低", description: "不妨从小事开始" },
@@ -150,9 +160,16 @@ const moods = [
   color: #a55f55;
   font-size: 13px;
 }
+.plan-hint {
+  grid-column: 1/-1;
+  margin: -6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
 .primary:disabled {
-  cursor: wait;
-  opacity: 0.72;
+  cursor: not-allowed;
+  opacity: 0.58;
 }
 @media (max-width: 760px) {
   .hero {

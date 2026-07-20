@@ -2,33 +2,19 @@
   <section class="page plan">
     <div class="analysis">
       <span class="eyebrow">AI 分析结果</span>
-      <div class="insights">
-        <div>
-          <h4>你的优势</h4>
-          <p>✓ 前端基础扎实</p>
-          <p>✓ 有工程化经验</p>
-          <p>✓ 学习动力强</p>
-        </div>
-        <div class="warn">
-          <h4>当前挑战</h4>
-          <p>△ 后端架构经验不足</p>
-          <p>△ 缺少完整项目经验</p>
-          <p>△ 容易焦虑和拖延</p>
-        </div>
+      <div v-if="goal" class="goal-summary">
+        <span class="state-badge">{{ goal.currentState }}</span>
+        <h2>{{ goal.title }}</h2>
+        <p>{{ goal.description }}</p>
       </div>
+      <p v-else class="empty-copy">请先在首页选择状态并输入目标。</p>
     </div>
 
     <div class="roadmap">
       <p v-if="goal?.generationSource === 'fallback'" class="fallback-note">
         当前大模型额度不可用，以下任务由本地临时模板生成。
       </p>
-      <span class="eyebrow">推荐成长路线 · 3个月</span>
-      <div class="months">
-        <div v-for="month in months" :key="month.name">
-          <b>{{ month.name }}</b
-          ><small>{{ month.description }}</small>
-        </div>
-      </div>
+      <span class="eyebrow">状态与目标共同生成 · 今日成长计划</span>
       <div class="task-list">
         <h3>今日任务 <small>Day 1</small></h3>
         <article
@@ -59,12 +45,6 @@ const emit = defineEmits<{
   updateTaskStatus: [task: Task, status: "TODO" | "DONE"];
 }>();
 
-const months = [
-  { name: "第1月", description: "后端基础" },
-  { name: "第2月", description: "项目实战" },
-  { name: "第3月", description: "部署上线" },
-];
-
 function handleTask(task: Task) {
   if (task.status === "DONE") {
     emit("updateTaskStatus", task, "TODO");
@@ -88,43 +68,31 @@ function handleTask(task: Task) {
   font-size: 13px;
   background: #f5e4dc;
 }
-.insights {
-  display: grid;
-  gap: 13px;
+.goal-summary {
   margin-top: 20px;
 }
-.insights > div {
-  padding: 15px;
-  border-radius: 13px;
+.goal-summary h2 {
+  margin: 16px 0 10px;
+  font-size: 22px;
+  line-height: 1.4;
+}
+.goal-summary p,
+.empty-copy {
+  color: #686b65;
+  line-height: 1.8;
+}
+.state-badge {
+  display: inline-flex;
+  padding: 7px 12px;
+  border-radius: 999px;
+  color: #4e685c;
   font-size: 13px;
-  line-height: 1.5;
-  background: #e3ebe5;
+  font-weight: 700;
+  background: var(--sage-soft);
 }
-.insights .warn {
-  background: #f2dfd3;
-}
-.months {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin: 20px 0 28px;
-}
-.months div {
-  padding: 17px;
-  border-radius: 14px;
-  text-align: center;
-  background: #eee7dd;
-}
-.months div:nth-child(2) {
-  background: #e3e8df;
-}
-.months div:nth-child(3) {
-  background: #e8ddd3;
-}
-.months small {
+.roadmap > .eyebrow {
   display: block;
-  margin-top: 5px;
-  color: #888;
+  margin-bottom: 20px;
 }
 .task-list h3 small {
   font-weight: 400;

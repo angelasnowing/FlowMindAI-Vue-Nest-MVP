@@ -1,9 +1,8 @@
-import { IsOptional, IsString, MaxLength } from "class-validator";
+import { IsIn, IsString } from "class-validator";
 import { CreateGoalDto } from "./create-goal.dto";
 
 export class CreatePlanDto extends CreateGoalDto {
-  @IsOptional()
   @IsString()
-  @MaxLength(50)
-  mood?: string;
+  @IsIn(["能量较低", "目标清晰", "状态不错"])
+  currentState!: string;
 }

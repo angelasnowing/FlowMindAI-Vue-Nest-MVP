@@ -7,7 +7,7 @@
       <HomeView
         v-if="tab === 'home'"
         v-model:goal-input="goalInput"
-        v-model:mood="mood"
+        v-model:current-state="currentState"
         :loading="loading"
         :error-message="planError"
         @create-plan="createPlan"
@@ -62,7 +62,7 @@ import type { DashboardData, FocusStatistics, Task, TabKey } from "./types";
 const tab = ref<TabKey>("home");
 const data = ref<DashboardData | null>(null);
 const goalInput = ref("我想在1个月内学习5种国际象棋开局方式");
-const mood = ref("目标清晰");
+const currentState = ref("");
 const loading = ref(false);
 const planError = ref("");
 const selected = ref<Task | null>(null);
@@ -111,14 +111,14 @@ async function loadDashboard() {
 }
 
 async function createPlan() {
-  if (!goalInput.value.trim()) return;
+  if (!goalInput.value.trim() || !currentState.value) return;
 
   loading.value = true;
   planError.value = "";
   try {
     const goal = await goalsApi.createPlan({
       title: goalInput.value,
-      mood: mood.value,
+      currentState: currentState.value,
     });
     if (data.value) data.value.goals = [goal, ...data.value.goals];
     tab.value = "plan";
